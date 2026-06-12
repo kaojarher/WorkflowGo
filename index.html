@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Workflow 視覺化設計器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://apis.google.com/js/api.js" async onload="gapiLoaded()"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4f8;--surface:#fff;--surface2:#f8fafc;--border:#e2e8f0;
+  --accent:#2563eb;--accent2:#7c3aed;--text:#1e293b;--muted:#64748b;
+  --success:#059669;--warn:#d97706;--error:#dc2626;
+  --node-start:#10b981;--node-process:#2563eb;--node-branch:#f59e0b;--node-end:#7c3aed;
+}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── TOP BAR ── */
+.topbar{height:54px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 16px;flex-shrink:0;box-shadow:0 1px 8px rgba(37,99,235,.06)}
+.logo{font-weight:700;font-size:1rem;background:linear-gradient(135deg,#2563eb,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:8px;white-space:nowrap}
+.topbar-sep{width:1px;height:24px;background:var(--border);margin:0 4px}
+.tb-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:.8rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tb-btn:hover{background:var(--border);border-color:#cbd5e0}
+.tb-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tb-btn.primary:hover{background:#1d4ed8}
+.tb-btn.danger{color:var(--error);border-color:#fca5a5}
+.tb-btn.danger:hover{background:#fef2f2}
+.tb-btn:disabled{opacity:.5;cursor:not-allowed}
+.spacer{flex:1}
+select.tb-select{padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:.8rem;cursor:pointer}
+
+/* ── LAYOUT ── */
+.main{flex:1;display:flex;overflow:hidden}
+
+/* ── LEFT PANEL ── */
+.left-panel{width:200px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.panel-title{font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:12px 14px 6px}
+.node-palette{padding:8px;display:flex;flex-direction:column;gap:6px}
+.palette-item{padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);cursor:grab;font-size:.8rem;font-weight:500;display:flex;align-items:center;gap:8px;transition:all .15s;user-select:none}
+.palette-item:hover{transform:translateX(2px);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.palette-item.type-start{border-color:#10b981;color:#065f46;background:#f0fdf4}
+.palette-item.type-process{border-color:#2563eb;color:#1e3a8a;background:#eff6ff}
+.palette-item.type-branch{border-color:#f59e0b;color:#78350f;background:#fffbeb}
+.palette-item.type-end{border-color:#7c3aed;color:#4c1d95;background:#f5f3ff}
+.palette-icon{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+
+.input-section{border-top:1px solid var(--border);padding:10px}
+.input-section label{font-size:.72rem;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+textarea.global-input{width:100%;min-height:80px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px;font-size:.78rem;resize:vertical;font-family:inherit;line-height:1.5}
+textarea.global-input:focus{outline:none;border-color:var(--accent)}
+
+.file-drop-zone{border:1.5px dashed var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s;margin-top:6px;background:var(--surface2)}
+.file-drop-zone:hover,.file-drop-zone.dragover{border-color:var(--accent);background:#eff6ff}
+.file-drop-zone p{font-size:.72rem;color:var(--muted);line-height:1.4}
+.file-drop-zone strong{color:var(--accent);font-size:.75rem}
+.file-list{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.file-tag{display:flex;align-items:center;gap:5px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;padding:3px 7px;font-size:.7rem;color:#1e3a8a}
+.file-tag button{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:10px;margin-left:auto}
+.file-tag button:hover{color:var(--error)}
+
+/* ── CANVAS AREA ── */
+.canvas-wrap{flex:1;position:relative;overflow:hidden;background:
+  radial-gradient(circle,#e2e8f0 1px,transparent 1px);
+  background-size:24px 24px;
+  background-color:var(--bg)}
+#wf-canvas{position:absolute;top:0;left:0;cursor:grab}
+#wf-canvas.grabbing{cursor:grabbing}
+
+/* ── SVG NODES ── */
+.wf-node{cursor:pointer;user-select:none}
+.wf-node rect,.wf-node polygon,.wf-node ellipse{transition:filter .15s}
+.wf-node:hover rect,.wf-node:hover polygon,.wf-node:hover ellipse{filter:drop-shadow(0 4px 12px rgba(37,99,235,.25))}
+.wf-node.selected rect,.wf-node.selected polygon,.wf-node.selected ellipse{stroke-width:2.5 !important}
+.node-label{font-family:'Noto Sans TC',sans-serif;pointer-events:none}
+.node-status{font-size:9px;font-family:'Noto Sans TC',sans-serif;pointer-events:none}
+.connector-line{cursor:pointer;stroke-dasharray:none}
+.connector-line:hover{stroke-width:3 !important}
+
+/* ── RIGHT PANEL ── */
+.right-panel{width:340px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .2s}
+.right-panel.collapsed{width:0;overflow:hidden}
+.panel-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.panel-header h3{font-size:.88rem;font-weight:600;flex:1}
+.close-panel{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:2px 6px;border-radius:4px}
+.close-panel:hover{background:var(--border)}
+.panel-body{flex:1;overflow-y:auto;padding:14px}
+.field-group{margin-bottom:14px}
+.field-label{font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.04em}
+.field-input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:.82rem;font-family:inherit}
+.field-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+textarea.field-input{min-height:90px;resize:vertical;line-height:1.6}
+.field-hint{font-size:.7rem;color:var(--muted);margin-top:4px}
+
+.output-tabs{display:flex;gap:4px;margin-bottom:8px}
+.output-tab{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:.72rem;cursor:pointer}
+.output-tab.active{background:var(--accent2);color:#fff;border-color:var(--accent2)}
+.output-box{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;min-height:120px;font-size:.78rem;line-height:1.6;overflow-y:auto;max-height:220px;white-space:pre-wrap;font-family:'Space Mono',monospace}
+.output-html{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;min-height:120px;font-size:.82rem;line-height:1.6;overflow-y:auto;max-height:220px;display:none}
+.output-html h1,.output-html h2,.output-html h3{color:var(--accent);margin:8px 0 4px;font-weight:600}
+.output-html h1{font-size:1.1rem}.output-html h2{font-size:.95rem}.output-html h3{font-size:.85rem}
+.output-html p{margin-bottom:8px;color:#334155}
+.output-html ul,.output-html ol{margin-left:16px;margin-bottom:8px;color:#334155}
+.output-html code{background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:.75rem;color:#7c3aed}
+.output-html table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:.75rem}
+.output-html th,.output-html td{border:1px solid var(--border);padding:5px 7px}
+.output-html th{background:#eff6ff;color:#1e3a8a;font-weight:600}
+
+.export-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.exp-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:.72rem;cursor:pointer;transition:all .15s}
+.exp-btn:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.1)}
+
+.branch-config{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-top:8px}
+.branch-config label{font-size:.72rem;font-weight:600;color:#92400e;display:block;margin-bottom:5px}
+.branch-option{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.branch-option input{flex:1;padding:5px 8px;border:1px solid #fde68a;border-radius:6px;background:#fff;font-size:.78rem}
+.branch-option select{padding:5px 6px;border:1px solid #fde68a;border-radius:6px;background:#fff;font-size:.75rem}
+.branch-add-btn{padding:4px 8px;border:1px dashed #f59e0b;border-radius:6px;background:transparent;color:#b45309;font-size:.72rem;cursor:pointer;width:100%;margin-top:4px}
+.branch-add-btn:hover{background:#fef3c7}
+
+.status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:.72rem;font-weight:500}
+.status-badge.ready{background:#f0fdf4;color:#065f46;border:1px solid #bbf7d0}
+.status-badge.running{background:#fffbeb;color:#78350f;border:1px solid #fde68a;animation:pulse 1.5s infinite}
+.status-badge.done{background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe}
+.status-badge.error{background:#fef2f2;color:#991b1b;border:1px solid #fca5a5}
+@keyframes pulse{0%,100%{opacity:.7}50%{opacity:1}}
+
+/* ── MODALS ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(2px)}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--surface);border-radius:16px;padding:24px;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:1.05rem;font-weight:700;margin-bottom:16px;color:var(--text)}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
+.modal-btn{padding:8px 18px;border-radius:8px;font-size:.85rem;cursor:pointer;font-weight:500;border:1px solid var(--border)}
+.modal-btn.confirm{background:var(--accent);color:#fff;border-color:var(--accent)}
+.modal-btn.confirm:hover{background:#1d4ed8}
+.modal-btn.cancel{background:var(--surface2);color:var(--text)}
+.modal-btn.cancel:hover{background:var(--border)}
+
+/* ── MINI TOOLTIP ── */
+.tooltip{position:absolute;background:#1e293b;color:#fff;font-size:.72rem;padding:4px 8px;border-radius:5px;pointer-events:none;z-index:999;white-space:nowrap;opacity:0;transition:opacity .15s}
+
+/* ── API SETTINGS MODAL ── */
+.api-profile-list{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;margin-bottom:12px}
+.api-profile-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface2);cursor:pointer;transition:all .15s}
+.api-profile-item.active{border-color:var(--accent);background:#eff6ff}
+.api-profile-item:hover:not(.active){border-color:#94a3b8}
+.api-profile-badge{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0}
+.api-profile-item.active .api-profile-badge{background:var(--accent)}
+.api-profile-name{font-size:.82rem;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.api-profile-url{font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.api-profile-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px;border-radius:4px;flex-shrink:0}
+.api-profile-del:hover{background:#fef2f2;color:var(--error)}
+.api-form-row{display:flex;gap:8px;margin-bottom:10px}
+.api-form-row .field-input{flex:1}
+.profile-indicator{display:flex;align-items:center;gap:5px;font-size:.75rem;color:var(--muted);padding:4px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;transition:all .15s;white-space:nowrap;max-width:160px;overflow:hidden}
+.profile-indicator:hover{border-color:var(--accent);color:var(--accent)}
+.profile-dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0}
+.modal.wide{width:560px}
+.drive-btn{background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;border-color:transparent}
+.drive-btn:hover{opacity:.9;background:linear-gradient(135deg,#3367d6,#2d8a45)}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <span class="logo">⚡ AI Workflow 設計器</span>
+  <div class="topbar-sep"></div>
+  <button class="tb-btn" onclick="newWorkflow()">🗒 新建</button>
+  <button class="tb-btn" onclick="exportWorkflow()">📤 匯出 JSON</button>
+  <button class="tb-btn" onclick="document.getElementById('importFile').click()">📥 匯入 JSON</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importWorkflow(event)">
+  <div class="topbar-sep"></div>
+  <button class="tb-btn drive-btn" onclick="driveSignIn()" id="drive-signin-btn" style="display:none">☁ 登入 Drive</button>
+  <button class="tb-btn" onclick="driveSave()" id="drive-save-btn" style="display:none">☁ 存至 Drive</button>
+  <button class="tb-btn" onclick="driveLoad()" id="drive-load-btn" style="display:none">☁ 從 Drive 載入</button>
+  <button class="tb-btn drive-btn" onclick="initDrive()" id="drive-init-btn">☁ 連接 Drive</button>
+  <div class="topbar-sep"></div>
+  <select class="tb-select" id="model-select">
+    <option value="gemma3:27b">Gemma 3 (27B)</option>
+    <option value="llama3.1:70b">Llama 3.1 (70B)</option>
+    <option value="qwen2.5:72b">Qwen 2.5 (72B)</option>
+    <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+    <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+  </select>
+  <label style="font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:5px">
+    溫度
+    <input type="number" id="temp-input" value="0.7" step="0.1" min="0" max="1" style="width:60px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:.78rem;background:var(--surface2)">
+  </label>
+  <div class="spacer"></div>
+  <div class="profile-indicator" onclick="openApiSettings()" title="API 設定">
+    <span class="profile-dot" id="profile-dot"></span>
+    <span id="profile-name-display">未設定</span>
+  </div>
+  <button class="tb-btn" onclick="openApiSettings()" title="API 金鑰與端點設定">⚙ API 設定</button>
+  <button class="tb-btn" id="zoom-out-btn" onclick="zoomCanvas(-0.15)">－</button>
+  <span id="zoom-label" style="font-size:.75rem;color:var(--muted);min-width:36px;text-align:center">100%</span>
+  <button class="tb-btn" onclick="zoomCanvas(0.15)">＋</button>
+  <button class="tb-btn" onclick="fitCanvas()">⊡ 適合</button>
+  <div class="topbar-sep"></div>
+  <button class="tb-btn primary" id="run-btn" onclick="runWorkflow()">▶ 執行工作流</button>
+  <button class="tb-btn danger" onclick="stopWorkflow()">⏹</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <div class="panel-title">節點類型</div>
+    <div class="node-palette">
+      <div class="palette-item type-start" draggable="true" data-type="start" onmousedown="startDragFromPalette(event,'start')">
+        <div class="palette-icon" style="background:#d1fae5">▶</div>開始節點
+      </div>
+      <div class="palette-item type-process" draggable="true" data-type="process" onmousedown="startDragFromPalette(event,'process')">
+        <div class="palette-icon" style="background:#dbeafe">⬛</div>處理步驟
+      </div>
+      <div class="palette-item type-branch" draggable="true" data-type="branch" onmousedown="startDragFromPalette(event,'branch')">
+        <div class="palette-icon" style="background:#fef3c7">◆</div>條件分支
+      </div>
+      <div class="palette-item type-end" draggable="true" data-type="end" onmousedown="startDragFromPalette(event,'end')">
+        <div class="palette-icon" style="background:#ede9fe">⏹</div>結束節點
+      </div>
+    </div>
+
+    <div class="input-section">
+      <label>全域輸入資料</label>
+      <textarea class="global-input" id="global-input" placeholder="請輸入工作流的初始輸入文字、主題或資料...">科技創新對於現代社會的影響</textarea>
+
+      <label style="margin-top:10px;display:block">多模態檔案輸入</label>
+      <div class="file-drop-zone" id="dropZone"
+        ondrop="handleFileDrop(event)" ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')" onclick="document.getElementById('fileInput').click()">
+        <p><strong>點擊或拖放</strong></p>
+        <p>PDF · DOCX · PPTX · TXT · MD</p>
+      </div>
+      <input type="file" id="fileInput" multiple accept=".pdf,.docx,.pptx,.txt,.md,.png,.jpg,.jpeg"
+        style="display:none" onchange="handleFileSelect(event)">
+      <div class="file-list" id="fileList"></div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap" id="canvasWrap"
+    onmousedown="canvasMouseDown(event)"
+    onmousemove="canvasMouseMove(event)"
+    onmouseup="canvasMouseUp(event)"
+    ondrop="canvasDrop(event)"
+    ondragover="event.preventDefault()"
+    onwheel="canvasWheel(event)">
+    <svg id="wf-canvas" width="4000" height="3000">
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+        </marker>
+        <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+        </marker>
+        <marker id="arrowhead-branch" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+        </marker>
+      </defs>
+      <g id="connections-layer"></g>
+      <g id="nodes-layer"></g>
+      <g id="drag-layer"></g>
+    </svg>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel" id="rightPanel">
+    <div class="panel-header">
+      <h3 id="panel-node-title">節點設定</h3>
+      <button class="close-panel" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panel-body">
+      <p style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px 0">
+        點擊畫布上的節點<br>以編輯其設定
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- API SETTINGS MODAL -->
+<div class="modal-overlay hidden" id="apiSettingsModal">
+  <div class="modal wide">
+    <h2>⚙ API 設定</h2>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">管理多組 API 金鑰與端點，設定將自動儲存於本機。</p>
+
+    <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">已儲存的設定檔</div>
+    <div class="api-profile-list" id="api-profile-list"></div>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:6px">
+      <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px" id="api-form-title">➕ 新增設定檔</div>
+      <div class="field-group">
+        <label class="field-label">設定檔名稱</label>
+        <input type="text" class="field-input" id="api-profile-name" placeholder="例：本地 Ollama、OpenAI、AIDC...">
+      </div>
+      <div class="field-group">
+        <label class="field-label">API 端點 URL</label>
+        <input type="text" class="field-input" id="api-url-input" placeholder="https://api.example.com/v1/chat/completions">
+      </div>
+      <div class="field-group">
+        <label class="field-label">API 金鑰</label>
+        <input type="password" class="field-input" id="api-key-input" placeholder="sk-...">
+        <div class="field-hint">金鑰加密儲存於本機，不會傳送至其他伺服器</div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="modal-btn cancel" onclick="closeApiSettings()">關閉</button>
+      <button class="modal-btn" onclick="clearApiForm()" style="margin-right:auto">清除</button>
+      <button class="modal-btn confirm" id="api-save-btn" onclick="saveApiProfile()">💾 儲存設定檔</button>
+    </div>
+  </div>
+</div>
+
+<!-- NODE EDIT MODAL (for quick double-click edit) -->
+<div class="modal-overlay hidden" id="nodeModal">
+  <div class="modal">
+    <h2 id="modal-title">設定節點</h2>
+    <div class="field-group">
+      <label class="field-label">節點名稱</label>
+      <input type="text" class="field-input" id="modal-name" placeholder="輸入節點名稱">
+    </div>
+    <div class="field-group" id="modal-prompt-group">
+      <label class="field-label">提示詞範本 (Prompt Template)</label>
+      <textarea class="field-input" id="modal-prompt" rows="5" placeholder="使用 {{input}} 代表上一步驟的輸出結果&#10;使用 {{file}} 代表上傳的檔案內容"></textarea>
+      <div class="field-hint">可用變數：<code>{{input}}</code> 上步輸出 ｜ <code>{{file}}</code> 上傳檔案</div>
+    </div>
+    <div id="modal-branch-group" style="display:none">
+      <div class="branch-config">
+        <label>條件分支設定</label>
+        <div id="modal-branches"></div>
+        <button class="branch-add-btn" onclick="addModalBranch()">＋ 新增分支條件</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+      <button class="modal-btn confirm" onclick="saveModal()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONNECT MODE TOOLTIP -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ══════════════════════════════════════════
+// API SETTINGS MANAGEMENT
+// ══════════════════════════════════════════
+const SETTINGS_KEY = 'wf_api_profiles';
+const ACTIVE_PROFILE_KEY = 'wf_active_profile';
+
+let apiProfiles = [];     // [{ id, name, url, key }]
+let activeProfileId = null;
+
+function loadApiSettings() {
+  try {
+    const saved = localStorage.getItem(SETTINGS_KEY);
+    if (saved) apiProfiles = JSON.parse(saved);
+    activeProfileId = localStorage.getItem(ACTIVE_PROFILE_KEY) || (apiProfiles[0]?.id ?? null);
+  } catch(e) {
+    apiProfiles = [];
+    activeProfileId = null;
+  }
+  // Migrate legacy hardcoded values if no profiles exist
+  if (!apiProfiles.length) {
+    const defaultProfile = { id: 'default', name: 'AIDC 預設', url: 'https://llm.aidc.com.tw/v1/chat/completions', key: 'sk-1kf0CA4mGGsQVK-74ooOwQ' };
+    apiProfiles = [defaultProfile];
+    activeProfileId = 'default';
+    saveApiSettingsToStorage();
+  }
+  updateProfileIndicator();
+}
+
+function saveApiSettingsToStorage() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(apiProfiles));
+  if (activeProfileId) localStorage.setItem(ACTIVE_PROFILE_KEY, activeProfileId);
+}
+
+function getActiveProfile() {
+  return apiProfiles.find(p => p.id === activeProfileId) || apiProfiles[0] || null;
+}
+
+function updateProfileIndicator() {
+  const p = getActiveProfile();
+  const dot = document.getElementById('profile-dot');
+  const name = document.getElementById('profile-name-display');
+  if (p) {
+    if (dot) dot.style.background = 'var(--success)';
+    if (name) name.textContent = p.name;
+  } else {
+    if (dot) dot.style.background = '#cbd5e0';
+    if (name) name.textContent = '未設定';
+  }
+}
+
+function openApiSettings() {
+  renderApiProfileList();
+  clearApiForm();
+  document.getElementById('apiSettingsModal').classList.remove('hidden');
+}
+
+function closeApiSettings() {
+  document.getElementById('apiSettingsModal').classList.add('hidden');
+}
+
+function renderApiProfileList() {
+  const list = document.getElementById('api-profile-list');
+  if (!list) return;
+  if (!apiProfiles.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:12px">尚無設定檔</div>';
+    return;
+  }
+  list.innerHTML = apiProfiles.map(p => `
+    <div class="api-profile-item${p.id === activeProfileId ? ' active' : ''}" onclick="setActiveProfile('${p.id}')">
+      <span class="api-profile-badge"></span>
+      <div style="flex:1;min-width:0">
+        <div class="api-profile-name">${escHtml(p.name)}</div>
+        <div class="api-profile-url">${escHtml(p.url)}</div>
+      </div>
+      <button class="tb-btn" style="padding:3px 8px;font-size:.7rem;flex-shrink:0" onclick="event.stopPropagation();editApiProfile('${p.id}')">✏</button>
+      <button class="api-profile-del" onclick="event.stopPropagation();deleteApiProfile('${p.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function setActiveProfile(id) {
+  activeProfileId = id;
+  saveApiSettingsToStorage();
+  updateProfileIndicator();
+  renderApiProfileList();
+}
+
+function editApiProfile(id) {
+  const p = apiProfiles.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('api-profile-name').value = p.name;
+  document.getElementById('api-url-input').value = p.url;
+  document.getElementById('api-key-input').value = p.key;
+  document.getElementById('api-save-btn').dataset.editId = id;
+  document.getElementById('api-form-title').textContent = '✏ 編輯設定檔';
+}
+
+function deleteApiProfile(id) {
+  if (!confirm('確定刪除此設定檔？')) return;
+  apiProfiles = apiProfiles.filter(p => p.id !== id);
+  if (activeProfileId === id) activeProfileId = apiProfiles[0]?.id || null;
+  saveApiSettingsToStorage();
+  updateProfileIndicator();
+  renderApiProfileList();
+}
+
+function saveApiProfile() {
+  const name = document.getElementById('api-profile-name').value.trim();
+  const url  = document.getElementById('api-url-input').value.trim();
+  const key  = document.getElementById('api-key-input').value.trim();
+  if (!name || !url || !key) { alert('請填寫名稱、URL 與 API 金鑰！'); return; }
+  const editId = document.getElementById('api-save-btn').dataset.editId;
+  if (editId) {
+    const p = apiProfiles.find(x => x.id === editId);
+    if (p) { p.name = name; p.url = url; p.key = key; }
+    delete document.getElementById('api-save-btn').dataset.editId;
+  } else {
+    const id = 'prof_' + Date.now();
+    apiProfiles.push({ id, name, url, key });
+    if (!activeProfileId) activeProfileId = id;
+  }
+  saveApiSettingsToStorage();
+  updateProfileIndicator();
+  renderApiProfileList();
+  clearApiForm();
+}
+
+function clearApiForm() {
+  document.getElementById('api-profile-name').value = '';
+  document.getElementById('api-url-input').value = '';
+  document.getElementById('api-key-input').value = '';
+  delete document.getElementById('api-save-btn').dataset.editId;
+  document.getElementById('api-form-title').textContent = '➕ 新增設定檔';
+}
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+
+let nodes = [];       // { id, type, x, y, w, h, name, prompt, branches, output, status }
+let connections = []; // { id, fromId, toId, label, branchIdx }
+let nodeIdCounter = 0;
+let connIdCounter = 0;
+
+let canvasTransform = { x: 80, y: 60, scale: 1 };
+let isDraggingCanvas = false;
+let isDraggingNode = false;
+let dragNodeId = null;
+let dragOffset = { x: 0, y: 0 };
+let panStart = { x: 0, y: 0 };
+let panOrigin = { x: 0, y: 0 };
+
+let connectMode = false;
+let connectFromId = null;
+let tempLine = null;
+
+let selectedNodeId = null;
+let modalNodeId = null;
+let uploadedFiles = []; // { name, type, content }
+let nodeRawTexts = {};
+let abortController = null;
+
+// palette drag
+let paletteDragType = null;
+let paletteDragActive = false;
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+window.onload = function() {
+  loadApiSettings();
+  applyTransform();
+  // default workflow
+  const n1 = addNode('start',   300, 200, '開始');
+  const n2 = addNode('process', 550, 200, '步驟 1：大綱', '請針對以下主題，擬定三段式的專業文章大綱（多用表格與清單）：\n\n{{input}}');
+  const n3 = addNode('process', 800, 200, '步驟 2：報告', '請將以下大綱擴寫成完整的繁體中文摘要報告：\n\n{{input}}');
+  const n4 = addNode('end',    1050, 200, '結束');
+  addConnection(n1, n2);
+  addConnection(n2, n3);
+  addConnection(n3, n4);
+  renderAll();
+  fitCanvas();
+};
+
+// ══════════════════════════════════════════
+// NODE MANAGEMENT
+// ══════════════════════════════════════════
+const NODE_SIZES = { start:{w:100,h:50}, process:{w:180,h:70}, branch:{w:100,h:100}, end:{w:100,h:50} };
+
+function addNode(type, x, y, name='', prompt='') {
+  const id = ++nodeIdCounter;
+  const sz = NODE_SIZES[type] || {w:160,h:60};
+  nodes.push({ id, type, x, y, w:sz.w, h:sz.h, name: name||`節點${id}`, prompt, branches:['是','否'], output:'', status:'ready' });
+  nodeRawTexts[id] = '';
+  return id;
+}
+
+function removeNode(id) {
+  nodes = nodes.filter(n=>n.id!==id);
+  connections = connections.filter(c=>c.fromId!==id && c.toId!==id);
+  delete nodeRawTexts[id];
+  if (selectedNodeId===id) closePanel();
+  renderAll();
+}
+
+function addConnection(fromId, toId, label='', branchIdx=0) {
+  // prevent duplicate
+  if (connections.find(c=>c.fromId===fromId&&c.toId===toId)) return;
+  connections.push({ id:++connIdCounter, fromId, toId, label, branchIdx });
+}
+
+function removeConnection(id) {
+  connections = connections.filter(c=>c.id!==id);
+  renderAll();
+}
+
+function getNode(id) { return nodes.find(n=>n.id===id); }
+
+// ══════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════
+const COLORS = {
+  start:   { fill:'#d1fae5', stroke:'#10b981', text:'#065f46' },
+  process: { fill:'#dbeafe', stroke:'#2563eb', text:'#1e3a8a' },
+  branch:  { fill:'#fef3c7', stroke:'#f59e0b', text:'#78350f' },
+  end:     { fill:'#ede9fe', stroke:'#7c3aed', text:'#4c1d95' },
+};
+const STATUS_ICONS = { ready:'', running:'⏳', done:'✓', error:'✗' };
+
+function renderAll() {
+  renderConnections();
+  renderNodes();
+}
+
+function renderConnections() {
+  const layer = document.getElementById('connections-layer');
+  layer.innerHTML = '';
+  connections.forEach(conn => {
+    const from = getNode(conn.fromId);
+    const to   = getNode(conn.toId);
+    if (!from||!to) return;
+
+    const fx = from.x + from.w/2;
+    const fy = from.type==='branch' ? from.y + from.h : from.y + from.h/2;
+    const tx = to.x;
+    const ty = to.y + to.h/2;
+
+    // curved path
+    const midX = (fx+tx)/2;
+    const d = `M${fx},${fy} C${midX},${fy} ${midX},${ty} ${tx},${ty}`;
+
+    const isBranch = from.type === 'branch';
+    const color = isBranch ? '#f59e0b' : '#94a3b8';
+    const marker = isBranch ? 'url(#arrowhead-branch)' : 'url(#arrowhead)';
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.dataset.connId = conn.id;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width','2');
+    path.setAttribute('marker-end', marker);
+    path.setAttribute('class','connector-line');
+    path.style.cursor='pointer';
+    path.addEventListener('click', e => { e.stopPropagation(); if(confirm('刪除此連線？')) { removeConnection(conn.id); } });
+
+    g.appendChild(path);
+
+    // label for branches
+    if (conn.label) {
+      const lx = (fx + tx) / 2;
+      const ly = (fy + ty) / 2 - 8;
+      const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+      lbl.setAttribute('x', lx); lbl.setAttribute('y', ly);
+      lbl.setAttribute('text-anchor','middle');
+      lbl.setAttribute('font-size','10');
+      lbl.setAttribute('fill','#b45309');
+      lbl.setAttribute('font-family','Noto Sans TC,sans-serif');
+      lbl.textContent = conn.label;
+      g.appendChild(lbl);
+    }
+
+    layer.appendChild(g);
+  });
+}
+
+function renderNodes() {
+  const layer = document.getElementById('nodes-layer');
+  layer.innerHTML = '';
+  nodes.forEach(n => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','wf-node' + (n.id===selectedNodeId?' selected':''));
+    g.setAttribute('data-id', n.id);
+    g.style.cursor = 'pointer';
+    g.addEventListener('mousedown', e => nodeMouseDown(e, n.id));
+    g.addEventListener('dblclick',  e => openModal(n.id));
+    g.addEventListener('click', e => { e.stopPropagation(); selectNode(n.id); });
+
+    const col = COLORS[n.type] || COLORS.process;
+
+    if (n.type === 'start' || n.type === 'end') {
+      const rx = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rx.setAttribute('x', n.x); rx.setAttribute('y', n.y);
+      rx.setAttribute('width', n.w); rx.setAttribute('height', n.h);
+      rx.setAttribute('rx', n.h/2);
+      rx.setAttribute('fill', col.fill); rx.setAttribute('stroke', col.stroke); rx.setAttribute('stroke-width','1.8');
+      g.appendChild(rx);
+    } else if (n.type === 'branch') {
+      const cx = n.x + n.w/2, cy = n.y + n.h/2;
+      const pts = `${cx},${n.y} ${n.x+n.w},${cy} ${cx},${n.y+n.h} ${n.x},${cy}`;
+      const diamond = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      diamond.setAttribute('points', pts);
+      diamond.setAttribute('fill', col.fill); diamond.setAttribute('stroke', col.stroke); diamond.setAttribute('stroke-width','1.8');
+      g.appendChild(diamond);
+    } else {
+      const rx = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rx.setAttribute('x', n.x); rx.setAttribute('y', n.y);
+      rx.setAttribute('width', n.w); rx.setAttribute('height', n.h);
+      rx.setAttribute('rx','10');
+      rx.setAttribute('fill', col.fill); rx.setAttribute('stroke', col.stroke); rx.setAttribute('stroke-width','1.8');
+      g.appendChild(rx);
+    }
+
+    // node name label
+    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x', n.x + n.w/2); txt.setAttribute('y', n.y + n.h/2);
+    txt.setAttribute('text-anchor','middle'); txt.setAttribute('dominant-baseline','central');
+    txt.setAttribute('font-size','11'); txt.setAttribute('font-weight','600');
+    txt.setAttribute('fill', col.text); txt.setAttribute('class','node-label');
+    txt.setAttribute('font-family','Noto Sans TC,sans-serif');
+    // truncate
+    const maxChars = Math.floor(n.w/8);
+    txt.textContent = n.name.length > maxChars ? n.name.slice(0,maxChars-1)+'…' : n.name;
+    g.appendChild(txt);
+
+    // status indicator
+    if (n.status && n.status !== 'ready') {
+      const stxt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      stxt.setAttribute('x', n.x + n.w - 8); stxt.setAttribute('y', n.y + 12);
+      stxt.setAttribute('text-anchor','end'); stxt.setAttribute('font-size','9');
+      stxt.setAttribute('fill', n.status==='done'?'#2563eb': n.status==='error'?'#dc2626':'#d97706');
+      stxt.setAttribute('class','node-status');
+      stxt.textContent = STATUS_ICONS[n.status] || '';
+      g.appendChild(stxt);
+    }
+
+    // "connect" port on right edge
+    if (n.type !== 'end') {
+      const port = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      const px = n.type==='branch' ? n.x+n.w/2 : n.x+n.w;
+      const py = n.type==='branch' ? n.y+n.h    : n.y+n.h/2;
+      port.setAttribute('cx', px); port.setAttribute('cy', py);
+      port.setAttribute('r','6'); port.setAttribute('fill','#fff');
+      port.setAttribute('stroke', col.stroke); port.setAttribute('stroke-width','2');
+      port.style.cursor = 'crosshair';
+      port.addEventListener('mousedown', e => { e.stopPropagation(); startConnect(n.id, e); });
+      g.appendChild(port);
+    }
+
+    // branch labels (Y/N on diamond exits)
+    if (n.type === 'branch') {
+      const lbl1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+      lbl1.setAttribute('x', n.x + n.w/2); lbl1.setAttribute('y', n.y + n.h + 14);
+      lbl1.setAttribute('text-anchor','middle'); lbl1.setAttribute('font-size','9');
+      lbl1.setAttribute('fill','#b45309'); lbl1.textContent = n.branches[0]||'是';
+      g.appendChild(lbl1);
+    }
+
+    layer.appendChild(g);
+  });
+}
+
+// ══════════════════════════════════════════
+// CANVAS TRANSFORM
+// ══════════════════════════════════════════
+function applyTransform() {
+  const canvas = document.getElementById('wf-canvas');
+  canvas.style.transform = `translate(${canvasTransform.x}px,${canvasTransform.y}px) scale(${canvasTransform.scale})`;
+  canvas.style.transformOrigin = '0 0';
+  document.getElementById('zoom-label').textContent = Math.round(canvasTransform.scale*100)+'%';
+}
+
+function zoomCanvas(delta) {
+  canvasTransform.scale = Math.min(2, Math.max(0.3, canvasTransform.scale + delta));
+  applyTransform();
+}
+
+function fitCanvas() {
+  if (!nodes.length) { canvasTransform={x:80,y:60,scale:1}; applyTransform(); return; }
+  const wrap = document.getElementById('canvasWrap');
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  const minX = Math.min(...nodes.map(n=>n.x));
+  const minY = Math.min(...nodes.map(n=>n.y));
+  const maxX = Math.max(...nodes.map(n=>n.x+n.w));
+  const maxY = Math.max(...nodes.map(n=>n.y+n.h));
+  const bw = maxX-minX+80, bh = maxY-minY+80;
+  const scale = Math.min(0.95, Math.min(ww/bw, wh/bh));
+  canvasTransform = {
+    x: (ww - bw*scale)/2 - minX*scale + 40*scale,
+    y: (wh - bh*scale)/2 - minY*scale + 40*scale,
+    scale
+  };
+  applyTransform();
+}
+
+function canvasWheel(e) {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.08 : 0.08;
+  zoomCanvas(delta);
+}
+
+// ══════════════════════════════════════════
+// DRAG NODES
+// ══════════════════════════════════════════
+function svgPoint(e) {
+  const wrap = document.getElementById('canvasWrap');
+  const rect = wrap.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left - canvasTransform.x) / canvasTransform.scale,
+    y: (e.clientY - rect.top  - canvasTransform.y) / canvasTransform.scale
+  };
+}
+
+function nodeMouseDown(e, id) {
+  e.stopPropagation();
+  if (connectMode) return;
+  isDraggingNode = true;
+  dragNodeId = id;
+  const pt = svgPoint(e);
+  const n = getNode(id);
+  dragOffset = { x: pt.x - n.x, y: pt.y - n.y };
+  document.getElementById('wf-canvas').classList.add('grabbing');
+}
+
+function canvasMouseDown(e) {
+  if (e.target === document.getElementById('canvasWrap') || e.target === document.getElementById('wf-canvas') || e.target.tagName==='svg') {
+    isDraggingCanvas = true;
+    panStart = { x: e.clientX, y: e.clientY };
+    panOrigin = { x: canvasTransform.x, y: canvasTransform.y };
+    document.getElementById('wf-canvas').classList.add('grabbing');
+    if (selectedNodeId) { selectedNodeId=null; closePanel(); renderAll(); }
+  }
+}
+
+function canvasMouseMove(e) {
+  if (isDraggingNode && dragNodeId) {
+    const pt = svgPoint(e);
+    const n = getNode(dragNodeId);
+    if (n) { n.x = pt.x - dragOffset.x; n.y = pt.y - dragOffset.y; renderAll(); }
+  } else if (isDraggingCanvas) {
+    canvasTransform.x = panOrigin.x + (e.clientX - panStart.x);
+    canvasTransform.y = panOrigin.y + (e.clientY - panStart.y);
+    applyTransform();
+  } else if (connectMode && connectFromId) {
+    drawTempLine(e);
+  } else if (paletteDragActive) {
+    // handled by dragover
+  }
+}
+
+function canvasMouseUp(e) {
+  if (isDraggingNode) { isDraggingNode=false; dragNodeId=null; }
+  if (isDraggingCanvas) { isDraggingCanvas=false; }
+  document.getElementById('wf-canvas').classList.remove('grabbing');
+  if (connectMode && tempLine) {
+    tempLine.remove(); tempLine=null;
+    connectMode=false; connectFromId=null;
+  }
+}
+
+// ══════════════════════════════════════════
+// CONNECT MODE
+// ══════════════════════════════════════════
+function startConnect(fromId, e) {
+  e.stopPropagation();
+  connectMode = true;
+  connectFromId = fromId;
+  drawTempLine(e);
+  // override next click on a node
+  const handler = (ev) => {
+    const tgt = ev.target.closest('[data-id]');
+    if (tgt) {
+      const toId = parseInt(tgt.dataset.id);
+      if (toId !== fromId) {
+        const from = getNode(fromId);
+        const label = from.type==='branch' ? (from.branches[connections.filter(c=>c.fromId===fromId).length]||'') : '';
+        addConnection(fromId, toId, label);
+        renderAll();
+        if (selectedNodeId===fromId) refreshPanel(fromId);
+      }
+    }
+    connectMode=false; connectFromId=null;
+    if (tempLine) { tempLine.remove(); tempLine=null; }
+    document.removeEventListener('click', handler, true);
+  };
+  setTimeout(()=> document.addEventListener('click', handler, true), 50);
+}
+
+function drawTempLine(e) {
+  const from = getNode(connectFromId);
+  if (!from) return;
+  const pt = svgPoint(e);
+  const fx = from.type==='branch' ? from.x+from.w/2 : from.x+from.w;
+  const fy = from.type==='branch' ? from.y+from.h    : from.y+from.h/2;
+
+  const layer = document.getElementById('drag-layer');
+  if (tempLine) tempLine.remove();
+  tempLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+  tempLine.setAttribute('x1',fx); tempLine.setAttribute('y1',fy);
+  tempLine.setAttribute('x2',pt.x); tempLine.setAttribute('y2',pt.y);
+  tempLine.setAttribute('stroke','#2563eb'); tempLine.setAttribute('stroke-width','2');
+  tempLine.setAttribute('stroke-dasharray','6 4');
+  tempLine.setAttribute('marker-end','url(#arrowhead-active)');
+  layer.appendChild(tempLine);
+}
+
+// ══════════════════════════════════════════
+// PALETTE DRAG TO CANVAS
+// ══════════════════════════════════════════
+function startDragFromPalette(e, type) {
+  paletteDragType = type;
+  paletteDragActive = true;
+}
+
+function canvasDrop(e) {
+  e.preventDefault();
+  if (!paletteDragType) return;
+  const wrap = document.getElementById('canvasWrap');
+  const rect = wrap.getBoundingClientRect();
+  const x = (e.clientX - rect.left - canvasTransform.x) / canvasTransform.scale;
+  const y = (e.clientY - rect.top  - canvasTransform.y) / canvasTransform.scale;
+  const sz = NODE_SIZES[paletteDragType]||{w:160,h:60};
+  const id = addNode(paletteDragType, x - sz.w/2, y - sz.h/2);
+  paletteDragType = null; paletteDragActive = false;
+  renderAll();
+  selectNode(id);
+}
+
+document.addEventListener('mouseup', ()=>{ paletteDragActive=false; });
+
+// ══════════════════════════════════════════
+// SELECTION & RIGHT PANEL
+// ══════════════════════════════════════════
+function selectNode(id) {
+  selectedNodeId = id;
+  renderAll();
+  refreshPanel(id);
+}
+
+function closePanel() {
+  selectedNodeId = null;
+  renderAll();
+  const panel = document.getElementById('rightPanel');
+  document.getElementById('panel-body').innerHTML = '<p style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px 0">點擊畫布上的節點<br>以編輯其設定</p>';
+  document.getElementById('panel-node-title').textContent = '節點設定';
+}
+
+function refreshPanel(id) {
+  const n = getNode(id);
+  if (!n) return;
+  document.getElementById('panel-node-title').textContent = n.name;
+  const body = document.getElementById('panel-body');
+  const col = COLORS[n.type]||COLORS.process;
+
+  const statusMap = { ready:'ready', running:'running', done:'done', error:'error' };
+  const statusLabel = { ready:'準備就緒', running:'執行中', done:'已完成', error:'發生錯誤' };
+
+  body.innerHTML = `
+    <div class="field-group">
+      <label class="field-label">節點類型</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="background:${col.fill};border:1px solid ${col.stroke};color:${col.text};padding:3px 10px;border-radius:99px;font-size:.72rem;font-weight:600">${n.type}</span>
+        <span class="status-badge ${statusMap[n.status]||'ready'}">${statusLabel[n.status]||'準備就緒'}</span>
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label">節點名稱</label>
+      <input type="text" class="field-input" value="${escHtml(n.name)}" onchange="getNode(${id}).name=this.value;document.getElementById('panel-node-title').textContent=this.value;renderAll()">
+    </div>
+    ${n.type!=='start'&&n.type!=='end' ? `
+    <div class="field-group">
+      <label class="field-label">提示詞範本</label>
+      <textarea class="field-input" rows="5" onchange="getNode(${id}).prompt=this.value">${escHtml(n.prompt)}</textarea>
+      <div class="field-hint">可用：<code>{{input}}</code> 上步輸出 ｜ <code>{{file}}</code> 檔案內容</div>
+    </div>` : ''}
+    ${n.type==='branch' ? `
+    <div class="field-group">
+      <div class="branch-config">
+        <label>分支條件（每行一個）</label>
+        <textarea class="field-input" rows="3" onchange="getNode(${id}).branches=this.value.split('\\n').filter(x=>x.trim());renderAll()">${(n.branches||[]).join('\n')}</textarea>
+        <div class="field-hint">每一行對應一個輸出分支連線標籤</div>
+      </div>
+    </div>` : ''}
+    ${n.output || nodeRawTexts[id] ? `
+    <div class="field-group">
+      <label class="field-label">輸出結果</label>
+      <div class="output-tabs">
+        <button class="output-tab active" id="ptab-md-${id}" onclick="switchOutTab(${id},'md')">原始碼</button>
+        <button class="output-tab" id="ptab-html-${id}" onclick="switchOutTab(${id},'html')">預覽</button>
+      </div>
+      <div class="output-box" id="pout-md-${id}">${escHtml(nodeRawTexts[id]||n.output)}</div>
+      <div class="output-html" id="pout-html-${id}">${marked.parse(nodeRawTexts[id]||n.output||'')}</div>
+      <div class="export-row">
+        <button class="exp-btn" onclick="exportSingleDocx(${id})">⬇ Word</button>
+        <button class="exp-btn" onclick="exportSinglePptx(${id})">⬇ PPTX</button>
+        <button class="exp-btn" onclick="handlePdfExport(this,${id})">⬇ PDF</button>
+      </div>
+    </div>` : ''}
+    <div class="field-group" style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">
+      <button class="tb-btn danger" style="width:100%;justify-content:center" onclick="removeNode(${id})">🗑 刪除此節點</button>
+    </div>
+  `;
+}
+
+function switchOutTab(id, tab) {
+  const md = document.getElementById(`pout-md-${id}`);
+  const html = document.getElementById(`pout-html-${id}`);
+  const tabMd = document.getElementById(`ptab-md-${id}`);
+  const tabHtml = document.getElementById(`ptab-html-${id}`);
+  if (tab==='html') {
+    md.style.display='none'; html.style.display='block';
+    tabMd.classList.remove('active'); tabHtml.classList.add('active');
+    html.innerHTML = marked.parse(nodeRawTexts[id]||'');
+  } else {
+    html.style.display='none'; md.style.display='block';
+    tabHtml.classList.remove('active'); tabMd.classList.add('active');
+  }
+}
+
+function escHtml(s='') { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ══════════════════════════════════════════
+// MODAL (double-click quick edit)
+// ══════════════════════════════════════════
+function openModal(id) {
+  const n = getNode(id);
+  if (!n) return;
+  modalNodeId = id;
+  document.getElementById('modal-title').textContent = `設定節點：${n.type}`;
+  document.getElementById('modal-name').value = n.name;
+  document.getElementById('modal-prompt').value = n.prompt||'';
+
+  const isPG = n.type!=='start'&&n.type!=='end';
+  document.getElementById('modal-prompt-group').style.display = isPG?'':'none';
+  document.getElementById('modal-branch-group').style.display = n.type==='branch'?'':'none';
+
+  if (n.type==='branch') {
+    renderModalBranches(n.branches||[]);
+  }
+  document.getElementById('nodeModal').classList.remove('hidden');
+}
+
+function renderModalBranches(branches) {
+  const container = document.getElementById('modal-branches');
+  container.innerHTML = '';
+  branches.forEach((b,i) => {
+    const row = document.createElement('div');
+    row.className = 'branch-option';
+    row.innerHTML = `<input value="${escHtml(b)}" placeholder="分支名稱 ${i+1}" onchange="updateModalBranch(${i},this.value)">
+      <button onclick="removeModalBranch(${i})" style="background:none;border:none;color:var(--error);cursor:pointer;font-size:12px">✕</button>`;
+    container.appendChild(row);
+  });
+}
+
+function addModalBranch() {
+  const n = getNode(modalNodeId);
+  if (!n) return;
+  n.branches.push('分支'+(n.branches.length+1));
+  renderModalBranches(n.branches);
+}
+
+function removeModalBranch(idx) {
+  const n = getNode(modalNodeId);
+  if (!n) return;
+  n.branches.splice(idx,1);
+  renderModalBranches(n.branches);
+}
+
+function updateModalBranch(idx, val) {
+  const n = getNode(modalNodeId);
+  if (n) n.branches[idx] = val;
+}
+
+function saveModal() {
+  const n = getNode(modalNodeId);
+  if (!n) return;
+  n.name = document.getElementById('modal-name').value || n.name;
+  n.prompt = document.getElementById('modal-prompt').value;
+  renderAll();
+  if (selectedNodeId===modalNodeId) refreshPanel(modalNodeId);
+  closeModal();
+}
+
+function closeModal() {
+  document.getElementById('nodeModal').classList.add('hidden');
+  modalNodeId = null;
+}
+
+// ══════════════════════════════════════════
+// FILE UPLOAD & PARSING
+// ══════════════════════════════════════════
+function handleFileDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragover');
+  [...e.dataTransfer.files].forEach(processFile);
+}
+
+function handleFileSelect(e) {
+  [...e.target.files].forEach(processFile);
+  e.target.value='';
+}
+
+function processFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+
+  if (ext==='txt'||ext==='md') {
+    reader.onload = e => addUploadedFile(file.name, ext, e.target.result);
+    reader.readAsText(file);
+  } else if (ext==='pdf') {
+    reader.onload = e => {
+      const base64 = btoa(new Uint8Array(e.target.result).reduce((d,b)=>d+String.fromCharCode(b),''));
+      addUploadedFile(file.name, 'pdf', `[PDF Base64 已載入：${file.name}，${Math.round(file.size/1024)}KB]`);
+      // store raw for API multimodal
+      const idx = uploadedFiles.findIndex(f=>f.name===file.name);
+      if (idx>=0) uploadedFiles[idx].base64 = base64;
+    };
+    reader.readAsArrayBuffer(file);
+  } else if (ext==='docx'||ext==='pptx') {
+    reader.onload = e => addUploadedFile(file.name, ext, `[${ext.toUpperCase()} 已載入：${file.name}，${Math.round(file.size/1024)}KB]`);
+    reader.readAsArrayBuffer(file);
+  } else if (['png','jpg','jpeg'].includes(ext)) {
+    reader.onload = e => addUploadedFile(file.name, 'image', e.target.result);
+    reader.readAsDataURL(file);
+  }
+}
+
+function addUploadedFile(name, type, content) {
+  if (uploadedFiles.find(f=>f.name===name)) return;
+  uploadedFiles.push({ name, type, content });
+  renderFileList();
+}
+
+function renderFileList() {
+  const list = document.getElementById('fileList');
+  list.innerHTML = '';
+  uploadedFiles.forEach((f,i) => {
+    const icons = {pdf:'📄',txt:'📝',md:'📝',docx:'📋',pptx:'📊',image:'🖼'};
+    const tag = document.createElement('div');
+    tag.className='file-tag';
+    tag.innerHTML=`${icons[f.type]||'📎'} <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+      <button onclick="removeFile(${i})">✕</button>`;
+    list.appendChild(tag);
+  });
+}
+
+function removeFile(i) {
+  uploadedFiles.splice(i,1);
+  renderFileList();
+}
+
+function buildFileContext() {
+  return uploadedFiles.map(f=>{
+    if (f.type==='image') return `[圖片檔案：${f.name}]`;
+    if (f.content && typeof f.content==='string' && !f.content.startsWith('['))
+      return `--- 檔案：${f.name} ---\n${f.content}\n--- 結束 ---`;
+    return f.content;
+  }).filter(Boolean).join('\n\n');
+}
+
+// ══════════════════════════════════════════
+// WORKFLOW EXECUTION
+// ══════════════════════════════════════════
+function getExecutionOrder() {
+  // topological sort
+  const visited = new Set();
+  const order = [];
+  const startNodes = nodes.filter(n=>n.type==='start');
+  if (!startNodes.length && nodes.length) startNodes.push(nodes[0]);
+
+  function dfs(id) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    const outConns = connections.filter(c=>c.fromId===id);
+    // For branch nodes, pick first outgoing (simple sequential fallback)
+    outConns.forEach(c => dfs(c.toId));
+    order.push(id);
+  }
+  startNodes.forEach(n=>dfs(n.id));
+  order.reverse();
+  // include any isolated nodes
+  nodes.forEach(n=>{ if(!visited.has(n.id)) order.push(n.id); });
+  return order;
+}
+
+async function runWorkflow() {
+  const globalInput = document.getElementById('global-input').value.trim();
+  if (!globalInput && !uploadedFiles.length) { alert('請先輸入全域資料或上傳檔案！'); return; }
+
+  abortController = new AbortController();
+  const order = getExecutionOrder();
+  const model = document.getElementById('model-select').value;
+  const temp  = parseFloat(document.getElementById('temp-input').value);
+  const fileCtx = buildFileContext();
+
+  // reset
+  nodes.forEach(n=>{ n.status='ready'; n.output=''; nodeRawTexts[n.id]=''; });
+  renderAll();
+
+  const runBtn = document.getElementById('run-btn');
+  runBtn.disabled=true; runBtn.textContent='⏳ 執行中';
+
+  let currentInput = globalInput + (fileCtx ? '\n\n'+fileCtx : '');
+
+  for (const nid of order) {
+    const n = getNode(nid);
+    if (!n || n.type==='start'||n.type==='end') continue;
+    if (abortController.signal.aborted) break;
+
+    n.status = 'running';
+    renderAll();
+    if (selectedNodeId===nid) refreshPanel(nid);
+
+    const finalPrompt = (n.prompt||'{{input}}')
+      .replace(/\{\{input\}\}/g, currentInput)
+      .replace(/\{\{file\}\}/g, fileCtx);
+
+    let fullText = '';
+    try {
+      const profile = getActiveProfile();
+      if (!profile) { n.status='error'; nodeRawTexts[nid]='錯誤：請先在「API 設定」中設定 API 金鑰與端點'; renderAll(); continue; }
+      const resp = await fetch(profile.url, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${profile.key}` },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          model, temperature:temp, stream:true,
+          messages:[{ role:'user', content: finalPrompt }]
+        })
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = dec.decode(value);
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data==='[DONE]') break;
+          try {
+            const delta = JSON.parse(data).choices?.[0]?.delta?.content||'';
+            fullText += delta;
+            nodeRawTexts[nid] = fullText;
+            if (selectedNodeId===nid) {
+              const el = document.getElementById(`pout-md-${nid}`);
+              if (el) el.textContent = fullText;
+            }
+          } catch {}
+        }
+      }
+
+      n.output = fullText;
+      n.status = 'done';
+      nodeRawTexts[nid] = fullText;
+      currentInput = fullText;
+      renderAll();
+      if (selectedNodeId===nid) refreshPanel(nid);
+
+    } catch(err) {
+      if (err.name==='AbortError') { n.status='ready'; break; }
+      n.status='error';
+      nodeRawTexts[nid] = `錯誤：${err.message}`;
+      renderAll();
+      if (selectedNodeId===nid) refreshPanel(nid);
+    }
+  }
+
+  runBtn.disabled=false; runBtn.textContent='▶ 執行工作流';
+}
+
+function stopWorkflow() {
+  if (abortController) abortController.abort();
+}
+
+// ══════════════════════════════════════════
+// IMPORT / EXPORT
+// ══════════════════════════════════════════
+function exportWorkflow() {
+  const profile = getActiveProfile();
+  const data = {
+    version: '2.0',
+    globalInput: document.getElementById('global-input').value,
+    activeProfileName: profile?.name || '',
+    nodes: nodes.map(n=>({...n, output:'', status:'ready'})),
+    connections,
+    nodeIdCounter, connIdCounter
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `workflow_${Date.now()}.json`;
+  a.click();
+}
+
+function importWorkflow(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      nodes = data.nodes||[];
+      connections = data.connections||[];
+      nodeIdCounter = data.nodeIdCounter||nodes.length;
+      connIdCounter = data.connIdCounter||connections.length;
+      nodeRawTexts = {};
+      nodes.forEach(n=>{ nodeRawTexts[n.id]=''; n.status='ready'; });
+      if (data.globalInput) document.getElementById('global-input').value = data.globalInput;
+      renderAll();
+      fitCanvas();
+      closePanel();
+    } catch { alert('JSON 格式錯誤，無法匯入'); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+function newWorkflow() {
+  if (!confirm('清除目前的工作流，建立新的空白畫布？')) return;
+  nodes=[]; connections=[]; nodeIdCounter=0; connIdCounter=0; nodeRawTexts={};
+  uploadedFiles=[]; renderFileList();
+  selectedNodeId=null; closePanel();
+  renderAll();
+}
+
+// ══════════════════════════════════════════
+// EXPORT DOCS (preserved from v5)
+// ══════════════════════════════════════════
+function parseMarkdownToBlocks(mdText) {
+  const lines = mdText.split('\n');
+  const blocks = [];
+  lines.forEach(line => {
+    if (line.startsWith('### ')) blocks.push({ type:'h3', text:line.slice(4).trim() });
+    else if (line.startsWith('## '))  blocks.push({ type:'h2', text:line.slice(3).trim() });
+    else if (line.startsWith('# '))   blocks.push({ type:'h1', text:line.slice(2).trim() });
+    else if (/^[-*+] /.test(line))    blocks.push({ type:'li', text:line.slice(2).trim() });
+    else if (/^\d+\. /.test(line))    blocks.push({ type:'oli', text:line.replace(/^\d+\. /,'').trim() });
+    else if (line.trim()==='')        blocks.push({ type:'blank' });
+    else if (line.trim())             blocks.push({ type:'p', text:line.trim() });
+  });
+  return blocks;
+}
+
+async function exportPdf(id) {
+  const n = getNode(id);
+  const rawText = nodeRawTexts[id]||n?.output||'';
+  if (!rawText) { alert('無資料可匯出！'); return; }
+  const title = n?.name||'輸出';
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const margin = 20, contentW = pageW - margin*2;
+
+  const tempDiv = document.createElement('div');
+  tempDiv.style.cssText='position:fixed;top:-9999px;left:-9999px;width:794px;background:#fff;color:#111;font-family:Arial,sans-serif;font-size:13px;line-height:1.7;padding:40px';
+  tempDiv.innerHTML=`<h1 style="font-size:22px;color:#2563eb;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-bottom:16px">${title}</h1>${marked.parse(rawText)}`;
+  tempDiv.querySelectorAll('table').forEach(t=>t.style.cssText='border-collapse:collapse;width:100%;margin:12px 0;font-size:12px');
+  tempDiv.querySelectorAll('th,td').forEach(c=>c.style.cssText='border:1px solid #ccc;padding:6px 8px');
+  document.body.appendChild(tempDiv);
+  const canvas = await html2canvas(tempDiv,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
+  document.body.removeChild(tempDiv);
+  const imgH = (canvas.height/canvas.width)*contentW;
+  let remainH=imgH, srcY=0;
+  while(remainH>0) {
+    const sliceH=Math.min(remainH, pdf.internal.pageSize.getHeight()-margin*2);
+    const sliceCanvas=document.createElement('canvas');
+    sliceCanvas.width=canvas.width; sliceCanvas.height=(sliceH/imgH)*canvas.height;
+    sliceCanvas.getContext('2d').drawImage(canvas,0,srcY,canvas.width,sliceCanvas.height,0,0,canvas.width,sliceCanvas.height);
+    pdf.addImage(sliceCanvas.toDataURL('image/jpeg',0.92),'JPEG',margin,margin,contentW,sliceH);
+    srcY+=sliceCanvas.height; remainH-=sliceH;
+    if(remainH>0) pdf.addPage();
+  }
+  pdf.save(`${title}.pdf`);
+}
+
+async function handlePdfExport(btn, id) {
+  const orig=btn.textContent; btn.textContent='⏳...'; btn.disabled=true;
+  try { await exportPdf(id); } finally { btn.textContent=orig; btn.disabled=false; }
+}
+
+async function exportSingleDocx(id) {
+  const n = getNode(id);
+  const rawText = nodeRawTexts[id]||n?.output||'';
+  if (!rawText) { alert('無資料可匯出！'); return; }
+  const title = n?.name||'輸出';
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
+  const blocks = parseMarkdownToBlocks(rawText);
+  const children = [new Paragraph({ text:title, heading:HeadingLevel.TITLE, spacing:{after:300} })];
+  blocks.forEach(block=>{
+    if (block.type==='blank') children.push(new Paragraph({text:''}));
+    else if (block.type==='h1') children.push(new Paragraph({text:block.text,heading:HeadingLevel.HEADING_1}));
+    else if (block.type==='h2') children.push(new Paragraph({text:block.text,heading:HeadingLevel.HEADING_2}));
+    else if (block.type==='h3') children.push(new Paragraph({text:block.text,heading:HeadingLevel.HEADING_3}));
+    else if (block.type==='li') children.push(new Paragraph({children:[new TextRun({text:`• ${block.text}`})],indent:{left:360},spacing:{after:100}}));
+    else if (block.type==='p') {
+      const parts=block.text.split(/(\*\*[^*]+\*\*)/g);
+      const runs=parts.map(p=>/^\*\*.*\*\*$/.test(p)?new TextRun({text:p.slice(2,-2),bold:true}):new TextRun({text:p}));
+      children.push(new Paragraph({children:runs,spacing:{after:150}}));
+    }
+  });
+  const doc = new Document({ sections:[{children}] });
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`${title}.docx`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportSinglePptx(id) {
+  const n = getNode(id);
+  const rawText = nodeRawTexts[id]||n?.output||'';
+  if (!rawText) { alert('無資料可匯出！'); return; }
+  const title = n?.name||'輸出';
+  const pptx = new PptxGenJS();
+  pptx.layout='LAYOUT_WIDE';
+  const COLORS_P = { bg:'1E293B', accent:'38BDF8', text:'E2E8F0', sub:'94A3B8', div:'334155' };
+  const cover=pptx.addSlide();
+  cover.background={color:'0F172A'};
+  cover.addText(title,{x:.6,y:1.5,w:8.8,h:1.5,fontSize:36,bold:true,color:COLORS_P.accent,fontFace:'Arial',align:'center',wrap:true});
+  cover.addText(new Date().toLocaleDateString('zh-TW'),{x:.6,y:3.5,w:8.8,h:.4,fontSize:12,color:COLORS_P.sub,fontFace:'Arial',align:'center'});
+
+  const lines=rawText.split('\n');
+  let slideTitle='', bullets=[];
+  function flush(){
+    if(!slideTitle&&!bullets.length) return;
+    const sl=pptx.addSlide();
+    sl.background={color:COLORS_P.bg};
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:'100%',h:1.0,fill:{color:'0F172A'}});
+    sl.addText(slideTitle||'內容',{x:.4,y:.1,w:9.2,h:.8,fontSize:22,bold:true,color:COLORS_P.accent,fontFace:'Arial',valign:'middle'});
+    if(bullets.length){
+      const objs=bullets.map(b=>({text:b.text,options:{bullet:b.isBullet?{type:'bullet'}:false,bold:b.isBold,fontSize:b.isBold?15:13,color:b.isBold?'F1F5F9':COLORS_P.text,breakLine:true}}));
+      sl.addText(objs,{x:.4,y:1.15,w:9.2,h:3.6,fontFace:'Arial',valign:'top',wrap:true});
+    }
+  }
+  lines.forEach(line=>{
+    if(line.startsWith('# ')||line.startsWith('## ')){flush();slideTitle=line.replace(/^#{1,2} /,'');bullets=[];}
+    else if(line.startsWith('### ')){bullets.push({text:line.slice(4).trim(),isBullet:false,isBold:true});}
+    else if(/^[-*+] /.test(line)){bullets.push({text:line.slice(2).trim(),isBullet:true,isBold:false});}
+    else if(line.trim()){bullets.push({text:line.replace(/\*\*([^*]+)\*\*/g,'$1').trim(),isBullet:false,isBold:false});}
+  });
+  flush();
+  await pptx.writeFile({fileName:`${title}.pptx`});
+}
+// ══════════════════════════════════════════
+// GOOGLE DRIVE 雲端存檔
+// ══════════════════════════════════════════
+const CLIENT_ID = '375971288943-097rhbub5h2d06f1g5lqs60in6pofj22.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+let gapiReady = false;
+let gisReady = false;
+let tokenClient = null;
+let driveAccessToken = null;
+
+function gapiLoaded() {
+  gapi.load('client', async () => {
+    await gapi.client.init({
+      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+    });
+    gapiReady = true;
+    updateDriveUI();
+  });
+}
+
+function initDrive() {
+  if (!gapiReady) {
+    // Try to load gapi if not loaded yet
+    if (typeof gapi === 'undefined') {
+      alert('Google API 尚未載入，請稍後再試或重新整理頁面。');
+      return;
+    }
+    gapiLoaded();
+    setTimeout(() => initDrive(), 1500);
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: (tokenResponse) => {
+      if (tokenResponse.error) { alert('登入失敗：' + tokenResponse.error); return; }
+      driveAccessToken = tokenResponse.access_token;
+      gapi.client.setToken({ access_token: driveAccessToken });
+      updateDriveUI();
+      alert('✅ 已成功連接 Google Drive！');
+    }
+  });
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function driveSignIn() {
+  if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+  else initDrive();
+}
+
+function updateDriveUI() {
+  const initBtn  = document.getElementById('drive-init-btn');
+  const signinBtn = document.getElementById('drive-signin-btn');
+  const saveBtn  = document.getElementById('drive-save-btn');
+  const loadBtn  = document.getElementById('drive-load-btn');
+  if (driveAccessToken) {
+    if (initBtn) initBtn.style.display = 'none';
+    if (signinBtn) signinBtn.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = '';
+    if (loadBtn) loadBtn.style.display = '';
+  } else if (gapiReady) {
+    if (initBtn) initBtn.style.display = 'none';
+    if (signinBtn) signinBtn.style.display = '';
+    if (saveBtn) saveBtn.style.display = 'none';
+    if (loadBtn) loadBtn.style.display = 'none';
+  }
+}
+
+function buildWorkflowData() {
+  const profile = getActiveProfile();
+  return {
+    version: '2.0',
+    savedAt: new Date().toISOString(),
+    globalInput: document.getElementById('global-input').value,
+    activeProfileName: profile?.name || '',
+    nodes: nodes.map(n => ({...n, output:'', status:'ready'})),
+    connections,
+    nodeIdCounter,
+    connIdCounter
+  };
+}
+
+async function driveSave() {
+  if (!driveAccessToken) { alert('請先連接 Google Drive'); return; }
+  const data = buildWorkflowData();
+  const filename = `workflow_${new Date().toISOString().slice(0,10)}.json`;
+  const content = JSON.stringify(data, null, 2);
+
+  // Check if file exists to update, otherwise create
+  const saveBtn = document.getElementById('drive-save-btn');
+  const origText = saveBtn.textContent;
+  saveBtn.textContent = '⏳ 儲存中...'; saveBtn.disabled = true;
+
+  try {
+    // Search for existing file with same name pattern (latest)
+    const searchResp = await gapi.client.drive.files.list({
+      q: `name contains 'workflow_' and mimeType='application/json' and trashed=false`,
+      fields: 'files(id,name,modifiedTime)',
+      orderBy: 'modifiedTime desc',
+      pageSize: 10
+    });
+    const files = searchResp.result.files || [];
+
+    const boundary = '-------314159265358979323846';
+    const metadata = { name: filename, mimeType: 'application/json' };
+    const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${boundary}--`;
+
+    let url, method;
+    if (files.length > 0) {
+      // Ask user: update latest or create new
+      const latest = files[0];
+      const choice = confirm(`已有 ${files.length} 個工作流存檔。\n最新：${latest.name}\n\n按「確定」更新最新存檔\n按「取消」建立新存檔`);
+      if (choice) {
+        url = `https://www.googleapis.com/upload/drive/v3/files/${latest.id}?uploadType=multipart`;
+        method = 'PATCH';
+      } else {
+        url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+        method = 'POST';
+      }
+    } else {
+      url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+      method = 'POST';
+    }
+
+    const resp = await fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${driveAccessToken}`,
+        'Content-Type': `multipart/related; boundary="${boundary}"`
+      },
+      body
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(err);
+    }
+    alert('✅ 工作流已儲存至 Google Drive！');
+  } catch(e) {
+    alert('❌ 儲存失敗：' + e.message);
+  } finally {
+    saveBtn.textContent = origText; saveBtn.disabled = false;
+  }
+}
+
+async function driveLoad() {
+  if (!driveAccessToken) { alert('請先連接 Google Drive'); return; }
+  const loadBtn = document.getElementById('drive-load-btn');
+  const origText = loadBtn.textContent;
+  loadBtn.textContent = '⏳ 載入中...'; loadBtn.disabled = true;
+
+  try {
+    const searchResp = await gapi.client.drive.files.list({
+      q: `name contains 'workflow_' and mimeType='application/json' and trashed=false`,
+      fields: 'files(id,name,modifiedTime)',
+      orderBy: 'modifiedTime desc',
+      pageSize: 20
+    });
+    const files = (searchResp.result.files || []);
+    if (!files.length) { alert('Google Drive 上找不到工作流存檔。'); return; }
+
+    // Show picker UI
+    const chosen = await showDriveFilePicker(files);
+    if (!chosen) return;
+
+    const fileResp = await fetch(`https://www.googleapis.com/drive/v3/files/${chosen.id}?alt=media`, {
+      headers: { 'Authorization': `Bearer ${driveAccessToken}` }
+    });
+    const data = await fileResp.json();
+
+    nodes = data.nodes || [];
+    connections = data.connections || [];
+    nodeIdCounter = data.nodeIdCounter || nodes.length;
+    connIdCounter = data.connIdCounter || connections.length;
+    nodeRawTexts = {};
+    nodes.forEach(n => { nodeRawTexts[n.id] = ''; n.status = 'ready'; });
+    if (data.globalInput) document.getElementById('global-input').value = data.globalInput;
+    renderAll(); fitCanvas(); closePanel();
+    alert(`✅ 已從 Drive 載入：${chosen.name}`);
+  } catch(e) {
+    alert('❌ 載入失敗：' + e.message);
+  } finally {
+    loadBtn.textContent = origText; loadBtn.disabled = false;
+  }
+}
+
+function showDriveFilePicker(files) {
+  return new Promise(resolve => {
+    // Create inline picker modal
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '2000';
+    overlay.innerHTML = `
+      <div class="modal" style="width:420px">
+        <h2>☁ 選擇 Drive 存檔</h2>
+        <div style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;margin:12px 0">
+          ${files.map(f => `
+            <div style="padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s;background:var(--surface2)"
+              onmouseover="this.style.borderColor='var(--accent)'"
+              onmouseout="this.style.borderColor='var(--border)'"
+              data-id="${f.id}" data-name="${escHtml(f.name)}">
+              <div style="font-size:.82rem;font-weight:600">📄 ${escHtml(f.name)}</div>
+              <div style="font-size:.7rem;color:var(--muted)">${new Date(f.modifiedTime).toLocaleString('zh-TW')}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn cancel" id="drive-picker-cancel">取消</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+        resolve({ id: el.dataset.id, name: el.dataset.name });
+      });
+    });
+    overlay.querySelector('#drive-picker-cancel').addEventListener('click', () => {
+      document.body.removeChild(overlay);
+      resolve(null);
+    });
+  });
+}
+
+</script>
+</body>
+</html>
