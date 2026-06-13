@@ -1032,27 +1032,27 @@ textarea.field-input { min-height: 100px; resize: vertical; line-height: 1.6; }
 
       <div class="field-label" style="margin-bottom:8px">選擇模型</div>
       <div class="puter-model-grid">
-        <div class="puter-model-item selected" data-pmodel="claude-3-7-sonnet" onclick="selectPuterModel(this)">
+        <div class="puter-model-item disabled" data-pmodel="claude-3-7-sonnet">
           <span class="pm-icon">✨</span>
           Claude 3.7
         </div>
-        <div class="puter-model-item" data-pmodel="claude-3-5-sonnet" onclick="selectPuterModel(this)">
+        <div class="puter-model-item disabled" data-pmodel="claude-3-5-sonnet">
           <span class="pm-icon">🧠</span>
           Claude 3.5
         </div>
-        <div class="puter-model-item disabled" data-pmodel="gpt-4o-mini">
+        <div class="puter-model-item selected" data-pmodel="gpt-4o-mini" onclick="selectPuterModel(this)">
           <span class="pm-icon">⚡</span>
           GPT-4o mini
         </div>
-        <div class="puter-model-item disabled" data-pmodel="gpt-4o">
+        <div class="puter-model-item" data-pmodel="gpt-4o" onclick="selectPuterModel(this)">
           <span class="pm-icon">🟢</span>
           GPT-4o
         </div>
-        <div class="puter-model-item disabled" data-pmodel="gemini-2.0-flash">
+        <div class="puter-model-item" data-pmodel="gemini-2.0-flash" onclick="selectPuterModel(this)">
           <span class="pm-icon">💎</span>
           Gemini 2.0
         </div>
-        <div class="puter-model-item disabled" data-pmodel="meta-llama/llama-3.1-8b-instruct:free">
+        <div class="puter-model-item" data-pmodel="meta-llama/llama-3.1-8b-instruct:free" onclick="selectPuterModel(this)">
           <span class="pm-icon">🦙</span>
           Llama 3.1
         </div>
@@ -1706,7 +1706,7 @@ function loadDemo() {
 /* ═══════════════════════════════════════════
    AI SOURCE — PUTER (預設) + 自訂端點
 ═══════════════════════════════════════════ */
-let selectedPuterModel = localStorage.getItem('wf_puter_model') || 'claude-3-7-sonnet';
+let selectedPuterModel = localStorage.getItem('wf_puter_model') || 'gpt-4o-mini';
 let aiTab = localStorage.getItem('wf_ai_tab') || 'puter';
 
 function switchAiTab(tab) {
@@ -1758,9 +1758,9 @@ function loadCustomEndpoint() {
     });
   }
   switchAiTab(aiTab);
-  const disabledModels = ['gpt-4o-mini','gpt-4o','gemini-2.0-flash','meta-llama/llama-3.1-8b-instruct:free'];
-  let savedModel = localStorage.getItem('wf_puter_model') || 'claude-3-7-sonnet';
-  if (disabledModels.includes(savedModel)) { savedModel = 'claude-3-7-sonnet'; localStorage.setItem('wf_puter_model', savedModel); }
+  const disabledModels = ['claude-3-7-sonnet','claude-3-5-sonnet'];
+  let savedModel = localStorage.getItem('wf_puter_model') || 'gpt-4o-mini';
+  if (disabledModels.includes(savedModel)) { savedModel = 'gpt-4o-mini'; localStorage.setItem('wf_puter_model', savedModel); }
   selectedPuterModel = savedModel;
   document.querySelectorAll('[data-pmodel]').forEach(el => {
     el.classList.toggle('selected', el.dataset.pmodel === savedModel);
