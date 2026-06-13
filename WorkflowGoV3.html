@@ -709,6 +709,23 @@ textarea.field-input { min-height: 100px; resize: vertical; line-height: 1.6; }
 .puter-model-item:active { transform: scale(0.95); }
 .puter-model-item.selected { border-color: #10b981; background: #f0fdf4; color: #065f46; }
 .puter-model-item .pm-icon { font-size: 1.3rem; display: block; margin-bottom: 4px; }
+.puter-model-item.disabled {
+  opacity: .38;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(1);
+  position: relative;
+}
+.puter-model-item.disabled::after {
+  content: '不支援';
+  position: absolute;
+  bottom: 4px;
+  right: 5px;
+  font-size: .6rem;
+  color: var(--error);
+  font-weight: 700;
+  letter-spacing: .02em;
+}
 
 </style>
 </head>
@@ -1023,19 +1040,19 @@ textarea.field-input { min-height: 100px; resize: vertical; line-height: 1.6; }
           <span class="pm-icon">🧠</span>
           Claude 3.5
         </div>
-        <div class="puter-model-item" data-pmodel="gpt-4o-mini" onclick="selectPuterModel(this)">
+        <div class="puter-model-item disabled" data-pmodel="gpt-4o-mini">
           <span class="pm-icon">⚡</span>
           GPT-4o mini
         </div>
-        <div class="puter-model-item" data-pmodel="gpt-4o" onclick="selectPuterModel(this)">
+        <div class="puter-model-item disabled" data-pmodel="gpt-4o">
           <span class="pm-icon">🟢</span>
           GPT-4o
         </div>
-        <div class="puter-model-item" data-pmodel="gemini-2.0-flash" onclick="selectPuterModel(this)">
+        <div class="puter-model-item disabled" data-pmodel="gemini-2.0-flash">
           <span class="pm-icon">💎</span>
           Gemini 2.0
         </div>
-        <div class="puter-model-item" data-pmodel="meta-llama/llama-3.1-8b-instruct:free" onclick="selectPuterModel(this)">
+        <div class="puter-model-item disabled" data-pmodel="meta-llama/llama-3.1-8b-instruct:free">
           <span class="pm-icon">🦙</span>
           Llama 3.1
         </div>
@@ -1065,6 +1082,9 @@ textarea.field-input { min-height: 100px; resize: vertical; line-height: 1.6; }
         </div>
         <div class="puter-model-item" data-url="https://api.groq.com/openai/v1/chat/completions" data-type="openai" onclick="selectProvider(this)">
           <span class="pm-icon">⚡</span>Groq
+        </div>
+        <div class="puter-model-item" data-url="https://llm.aidc.com.tw/v1/chat/completions" data-type="openai" data-key="sk-1kf0CA4mGGsQVK-74ooOwQ" data-model="qwen2.5:72b" onclick="selectProvider(this)">
+          <span class="pm-icon">🇹🇼</span>AIDC
         </div>
         <div class="puter-model-item" data-url="" data-type="openai" onclick="selectProvider(this)">
           <span class="pm-icon">🔧</span>自訂
@@ -1700,6 +1720,7 @@ function switchAiTab(tab) {
 }
 
 function selectPuterModel(el) {
+  if (el.classList.contains('disabled')) return;
   document.querySelectorAll('[data-pmodel]').forEach(e => e.classList.remove('selected'));
   el.classList.add('selected');
   selectedPuterModel = el.dataset.pmodel;
@@ -1737,7 +1758,10 @@ function loadCustomEndpoint() {
     });
   }
   switchAiTab(aiTab);
-  const savedModel = localStorage.getItem('wf_puter_model') || 'claude-3-7-sonnet';
+  const disabledModels = ['gpt-4o-mini','gpt-4o','gemini-2.0-flash','meta-llama/llama-3.1-8b-instruct:free'];
+  let savedModel = localStorage.getItem('wf_puter_model') || 'claude-3-7-sonnet';
+  if (disabledModels.includes(savedModel)) { savedModel = 'claude-3-7-sonnet'; localStorage.setItem('wf_puter_model', savedModel); }
+  selectedPuterModel = savedModel;
   document.querySelectorAll('[data-pmodel]').forEach(el => {
     el.classList.toggle('selected', el.dataset.pmodel === savedModel);
   });
@@ -1767,8 +1791,11 @@ function selectProvider(el) {
     'https://openrouter.ai/api/v1/chat/completions': 'openai/gpt-4o-mini',
     'http://localhost:11434/v1/chat/completions': 'llama3',
     'https://api.groq.com/openai/v1/chat/completions': 'llama3-8b-8192',
+    'https://llm.aidc.com.tw/v1/chat/completions': 'qwen2.5:72b',
   };
   if (hints[url]) document.getElementById('custom-model-name').value = hints[url];
+  // 若按鈕有內建 key（如 AIDC），自動填入（不覆蓋使用者已手動輸入的值）
+  if (el.dataset.key) document.getElementById('custom-api-key2').value = el.dataset.key;
   saveCustomEndpoint();
 }
 
